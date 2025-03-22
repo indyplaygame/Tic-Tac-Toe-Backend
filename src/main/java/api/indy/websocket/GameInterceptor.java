@@ -28,7 +28,12 @@ public class GameInterceptor implements HandshakeInterceptor {
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
-        final String[] cookies = Objects.requireNonNull(request.getHeaders().getFirst(HttpHeaders.COOKIE)).split("; ");
+        if(request.getHeaders().getFirst(HttpHeaders.COOKIE) == null) {
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
+            return false;
+        }
+
+        final String[] cookies =  Objects.requireNonNull(request.getHeaders().getFirst(HttpHeaders.COOKIE)).split("; ");
         final String token = Util.getCookie(cookies, "token");
         if(token == null || !authService.verifyToken(UUID.fromString(token))) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
