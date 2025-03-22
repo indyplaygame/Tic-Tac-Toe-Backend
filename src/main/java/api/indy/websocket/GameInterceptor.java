@@ -28,20 +28,6 @@ public class GameInterceptor implements HandshakeInterceptor {
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
-        System.out.println(request.getHeaders().getFirst(HttpHeaders.COOKIE));
-
-        if(request.getHeaders().getFirst(HttpHeaders.COOKIE) == null) {
-            response.setStatusCode(HttpStatus.UNAUTHORIZED);
-            return false;
-        }
-
-        final String[] cookies =  Objects.requireNonNull(request.getHeaders().getFirst(HttpHeaders.COOKIE)).split("; ");
-        final String token = Util.getCookie(cookies, "token");
-        if(token == null || !authService.verifyToken(UUID.fromString(token))) {
-            response.setStatusCode(HttpStatus.UNAUTHORIZED);
-            return false;
-        }
-
         final Pattern pattern = Pattern.compile("/game/join/([^/]+)");
         final String path = request.getURI().getPath();
 
@@ -77,7 +63,6 @@ public class GameInterceptor implements HandshakeInterceptor {
             return false;
         }
 
-        attributes.put("token", token);
         attributes.put("gameId", gameId);
         return true;
     }

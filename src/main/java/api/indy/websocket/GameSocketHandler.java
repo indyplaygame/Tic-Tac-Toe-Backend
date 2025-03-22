@@ -2,6 +2,7 @@ package api.indy.websocket;
 
 import api.indy.model.game.Game;
 import api.indy.model.game.Player;
+import api.indy.service.AuthService;
 import api.indy.service.GameService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,57 +22,75 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class GameSocketHandler extends TextWebSocketHandler {
     private final Map<WebSocketSession, UUID> clients;
+    private final AuthService authService;
     private final GameService gameService;
     private final ObjectMapper serializer;
 
     @Autowired
-    public GameSocketHandler(GameService gameService) {
+    public GameSocketHandler(AuthService authService, GameService gameService) {
         this.clients = new ConcurrentHashMap<>();
+        this.authService = authService;
         this.gameService = gameService;
         this.serializer = new ObjectMapper();
     }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String token = session.getAttributes().get("token").toString();
-        UUID gameId = UUID.fromString(session.getAttributes().get("gameId").toString());
-        Game game = this.gameService.getGame(gameId);
-        if(game == null) {
-            session.close();
-            return;
-        }
-
-        if(!game.join(session)) {
-            session.close();
-            return;
-        }
-
-        session.sendMessage(new TextMessage(serializer.writeValueAsString(Map.of(
-            "type", "on_join",
-            "game", game,
-            "is_owner", game.owner().equals(token)
-        ))));
-
-        for(WebSocketSession player : game.players().keySet()) {
-            if(player == session) continue;
-
-            player.sendMessage(new TextMessage(serializer.writeValueAsString(Map.of(
-                "type", "player_join",
-                "player", game.players().get(session)
-            ))));
-        }
-
-        this.clients.put(session, gameId);
-    }
+    public void afterConnectionEstablished(WebSocketSession session) throws Exception {}
 
     @Override
     public void handleTextMessage(WebSocketSession session, TextMessage message) throws IOException {
+        Map<String, Object> data = serializer.readValue(message.getPayload(), Map.class);
+        String type = data.get("type").toString();
+
+        if(type.equalsIgnoreCase("auth")) {
+            String token = data.get("token").toString();
+            if(!authService.verifyToken(UUID.fromString(token))) {
+                session.close();
+                return;
+            }
+
+            session.getAttributes().put("token", token);
+
+            UUID gameId = UUID.fromString(session.getAttributes().get("gameId").toString());
+            Game game = this.gameService.getGame(gameId);
+            if(game == null) {
+                session.close();
+                return;
+            }
+
+            if(!game.join(session)) {
+                session.close();
+                return;
+            }
+
+            session.sendMessage(new TextMessage(serializer.writeValueAsString(Map.of(
+                "type", "on_join",
+                "game", game,
+                "is_owner", game.owner().equals(token)
+            ))));
+
+            for(WebSocketSession player : game.players().keySet()) {
+                if(player == session) continue;
+
+                player.sendMessage(new TextMessage(serializer.writeValueAsString(Map.of(
+                    "type", "player_join",
+                    "player", game.players().get(session)
+                ))));
+            }
+
+            this.clients.put(session, gameId);
+            return;
+        }
+
+        if(session.getAttributes().get("token") == null) {
+            session.close();
+            return;
+        }
+
         UUID gameId = this.clients.get(session);
         Game game = this.gameService.getGame(gameId);
 
-        Map<String, Object> data = serializer.readValue(message.getPayload(), Map.class);
-        String type = data.get("type").toString();
-        switch(type) {
+        switch(type.toLowerCase()) {
             case "update_readiness" -> {
                 boolean player_ready = (Boolean) data.get("ready");
 
