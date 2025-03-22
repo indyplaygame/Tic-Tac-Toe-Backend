@@ -28,6 +28,8 @@ public class GameInterceptor implements HandshakeInterceptor {
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
+        System.out.println(request.getHeaders().getFirst(HttpHeaders.COOKIE));
+
         if(request.getHeaders().getFirst(HttpHeaders.COOKIE) == null) {
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
