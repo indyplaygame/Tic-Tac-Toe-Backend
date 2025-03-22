@@ -59,7 +59,7 @@ public class GameService {
     }
 
     public Game resolveGame(String code) {
-        UUID gameId = this.gameCodes.get(code);
+        UUID gameId = this.gameCodes.get(code.toUpperCase());
         if(gameId == null) return null;
 
         return this.games.get(gameId);
