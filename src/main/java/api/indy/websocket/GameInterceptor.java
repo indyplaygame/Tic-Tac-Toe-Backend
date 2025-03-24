@@ -28,42 +28,10 @@ public class GameInterceptor implements HandshakeInterceptor {
 
     @Override
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler, Map<String, Object> attributes) throws Exception {
-        final Pattern pattern = Pattern.compile("/game/join/([^/]+)");
         final String path = request.getURI().getPath();
+        attributes.put("path", path);
+        attributes.put("query", request.getURI().getQuery());
 
-        Matcher matcher = pattern.matcher(path);
-        if(!matcher.find()) {
-            response.setStatusCode(HttpStatus.BAD_REQUEST);
-            return false;
-        }
-
-        final String gameId = matcher.group(1);
-        final Game game = this.gameService.getGame(UUID.fromString(gameId));
-        if(game == null) {
-            response.setStatusCode(HttpStatus.NOT_FOUND);
-            return false;
-        }
-
-        if(game.visibility().equals(Game.Visibility.PRIVATE)) {
-            final String password = Util.getParam(request.getURI().getQuery(), "pass");
-
-            if(password == null || !authService.verifyPassword(password, game.password())) {
-                response.setStatusCode(HttpStatus.FORBIDDEN);
-                return false;
-            }
-        }
-
-        if(game.playerCount() == 2) {
-            response.setStatusCode(HttpStatus.FORBIDDEN);
-            return false;
-        }
-
-        if(game.started()) {
-            response.setStatusCode(HttpStatus.FORBIDDEN);
-            return false;
-        }
-
-        attributes.put("gameId", gameId);
         return true;
     }
 

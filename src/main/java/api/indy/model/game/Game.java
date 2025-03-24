@@ -8,6 +8,7 @@ import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.IntStream;
 
 public class Game {
@@ -50,7 +51,7 @@ public class Game {
         this.visibility = Visibility.valueOf(visibility.toUpperCase());
         this.joinCode = joinCode;
         this.password = password;
-        this.players = new HashMap<>();
+        this.players = new ConcurrentHashMap<>();
         this.started = false;
     }
 
@@ -99,21 +100,37 @@ public class Game {
                 "player_turn", this.turns.peek().id(),
                 "players", this.players.values()
             ))));
+
+            player.setReady(false);
         }
 
         this.turn();
     }
 
     public void turn() throws IOException {
+        if(!this.started) return;
+
         Player player = this.turns.peek();
         if(player == null) return;
 
         player.session().sendMessage(new TextMessage(serializer.writeValueAsString(Map.of(
             "type", "game_turn"
         ))));
+
+        this.players.keySet().forEach(p -> {
+            try {
+                p.sendMessage(new TextMessage(serializer.writeValueAsString(Map.of(
+                    "type", "player_turn",
+                    "symbol", player.symbol()
+                ))));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     public void move(int row, int col) throws IOException {
+        if(!this.started) return;
         if(this.board.get(row).get(col) != 0) return;
 
         Player player = this.turns.poll();

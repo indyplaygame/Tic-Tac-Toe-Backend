@@ -26,8 +26,12 @@ public class AuthController {
 
     @PostMapping("/verify/{token}")
     public ResponseEntity<Map<String, String>> verifyToken(@PathVariable("token") String token) {
-        if(authService.verifyToken(UUID.fromString(token)))
-            return new ResponseEntity<>(Map.of("message", "Token is valid", "status", "200"), HttpStatus.OK);
-        else return new ResponseEntity<>(Map.of("message", "Token is invalid", "status", "401"), HttpStatus.OK);
+        try {
+            if(authService.verifyToken(UUID.fromString(token)))
+                return new ResponseEntity<>(Map.of("message", "Token is valid", "status", "200"), HttpStatus.OK);
+            else return new ResponseEntity<>(Map.of("message", "Token is invalid", "status", "401"), HttpStatus.OK);
+        } catch(IllegalArgumentException e) {
+            return new ResponseEntity<>(Map.of("message", "Invalid token"), HttpStatus.BAD_REQUEST);
+        }
     }
 }
